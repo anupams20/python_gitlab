@@ -1,0 +1,105 @@
+---
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend.dockerfile
+    ports:
+      - "8000:80"
+    volumes:
+      - ./app:/code/app
+      - ./migrations:/code/migrations
+      - ./alembic.ini:/code/alembic.ini
+    env_file: ".env"
+    depends_on:
+      - db
+      - rabbitmq
+    command: ["uvicorn", "app.main:app", "--port", "80", "--reload", "--host", "0.0.0.0"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: celery_worker.dockerfile
+    volumes:
+      - ./app:/code/app
+    env_file: ".env"
+    depends_on:
+      - rabbitmq
+    command: >
+      watchmedo auto-restart
+      --directory=.
+      --patterns="*.py"
+      --recursive
+      -- celery -A app.celery.celery.celery_app worker --loglevel=INFO --concurrency=4 --pool=gevent
+
+  db:
+    image: pgvector/pgvector:pg16
+    volumes:
+      - .data/pgdata:/var/lib/postgresql/data
+      - ./scripts/install-pgvector.sh:/docker-entrypoint-initdb.d/install-pgvector.sh
+    environment:
+      - POSTGRES_USER=beehyv
+      - POSTGRES_PASSWORD=beehyv123
+      - POSTGRES_DB=sahayak
+    ports:
+      - "5432:5432"
+
+  rabbitmq:
+    image: rabbitmq:3.8.19-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=beehyv
+      - RABBITMQ_DEFAULT_PASS=beehyv123
+      - RABBITMQ_DEFAULT_VHOST=beehyv
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.11.1
+    ports:
+      - "8123:8123"
+      - "9010:9000"
+      - "9009:9009"
+    volumes:
+      - .data/clickhouse/data:/var/lib/clickhouse
+      - .data/clickhouse/logs:/var/log/clickhouse-server
+      - ./config/clickhouse/init.sh:/docker-entrypoint-initdb.d/init-db.sh
+    environment:
+      CLICKHOUSE_USER: beehyv
+      CLICKHOUSE_PASSWORD: beehyv123
+  
+  jaeger:
+    image: jaegertracing/all-in-one:1.61.0
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - SPAN_STORAGE_TYPE=badger
+      - BADGER_EPHEMERAL=false
+      - BADGER_DIRECTORY_VALUE=/badger/data
+      - BADGER_DIRECTORY_KEY=/badger/key
+    volumes:
+      - .data/jaeger:/badger
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    volumes:
+      - ./config/prometheus:/etc/prometheus
+      - .data/prom_data:/prometheus
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana
+    volumes:
+      - ./config/grafana:/etc/grafana/provisioning/datasources
