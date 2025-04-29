@@ -1,0 +1,99 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+env:
+  SONAR_SCANNER_VERSION: "6.1.0.4477"
+  SONAR_SCANNER_HOME: "${{ github.workspace }}/sonar-scanner"
+  GIT_USER_NAME: "anupam.singh"
+  GIT_USER_EMAIL: "anupam.singh@beehyv.com"
+  # Poetry configuration (uncomment if needed)
+  # POETRY_VERSION_PART: ""
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: false
+      
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+      
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction --no-ansi --no-root
+      
+      - name: Run tests
+        run: |
+          poetry run pytest
+
+  scan:
+    name: SonarQube Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for better SonarQube analysis
+      
+      - name: Set up Git
+        run: |
+          git config --global user.name "${{ env.GIT_USER_NAME }}"
+          git config --global user.email "${{ env.GIT_USER_EMAIL }}"
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Download and install SonarQube Scanner
+        run: |
+          mkdir -p ${{ env.SONAR_SCANNER_HOME }}
+          curl -L -o sonar-scanner-cli.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${{ env.SONAR_SCANNER_VERSION }}-linux-x64.zip
+          unzip sonar-scanner-cli.zip -d ${{ env.SONAR_SCANNER_HOME }}
+          echo "${{ env.SONAR_SCANNER_HOME }}/sonar-scanner-${{ env.SONAR_SCANNER_VERSION }}-linux-x64/bin" >> $GITHUB_PATH
+      
+      - name: Run SonarQube Scanner
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          # Get PR number for pull request events
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          
+          if [ -n "$PR_NUMBER" ]; then
+            # For pull requests
+            sonar-scanner \
+              -D"sonar.sources=." \
+              -D"sonar.host.url=${SONAR_HOST_URL}" \
+              -D"sonar.token=${SONAR_TOKEN}" \
+              -D"sonar.analysis.branch=${GITHUB_HEAD_REF}" \
+              -D"sonar.analysis.pullRequest=${PR_NUMBER}" \
+              -D"sonar.buildString=${PR_NUMBER}"
+          else
+            # For branch pushes
+            sonar-scanner \
+              -D"sonar.sources=." \
+              -D"sonar.host.url=${SONAR_HOST_URL}" \
+              -D"sonar.token=${SONAR_TOKEN}" \
+              -D"sonar.analysis.branch=${GITHUB_REF_NAME}" \
+              -D"sonar.buildString=${GITHUB_RUN_ID}"
+          fi
