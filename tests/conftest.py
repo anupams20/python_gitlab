@@ -3,12 +3,88 @@ import os
 import sys
 import pytest
 from unittest.mock import MagicMock, patch
-from typing import Dict, Any
 
-# Apply global patches before any app modules are imported
+# We need to patch the Settings class before it's imported
+# First, identify the module path of the Settings class
+SETTINGS_MODULE = "app.core.config"
+
+# Mock the Settings class
+class MockSettings:
+    """A fake settings class that provides all required attributes."""
+    
+    def __init__(self, **kwargs):
+        # Set default values for all required settings
+        self.PROJECT_NAME = os.environ.get("PROJECT_NAME", "Test Project")
+        self.API_V1_STR = "/api/v1"
+        
+        # Database settings
+        self.POSTGRES_SERVER = os.environ.get("POSTGRES_SERVER", "mock")
+        self.POSTGRES_USER = os.environ.get("POSTGRES_USER", "postgres")
+        self.POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "postgres")
+        self.POSTGRES_DB = os.environ.get("POSTGRES_DB", "postgres")
+        self.SQLALCHEMY_DATABASE_URI = f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
+        
+        # Broker settings
+        self.BROKER_USER = os.environ.get("BROKER_USER", "guest")
+        self.BROKER_PASSWORD = os.environ.get("BROKER_PASSWORD", "guest")
+        self.BROKER_HOST = os.environ.get("BROKER_HOST", "localhost")
+        self.BROKER_PORT = os.environ.get("BROKER_PORT", "5672")
+        self.BROKER_VHOST = os.environ.get("BROKER_VHOST", "/")
+        self.CELERY_BROKER_URL = f"amqp://{self.BROKER_USER}:{self.BROKER_PASSWORD}@{self.BROKER_HOST}:{self.BROKER_PORT}/{self.BROKER_VHOST}"
+        self.CELERY_RESULT_BACKEND = f"rpc://{self.BROKER_USER}:{self.BROKER_PASSWORD}@{self.BROKER_HOST}:{self.BROKER_PORT}/{self.BROKER_VHOST}"
+        
+        # ClickHouse settings
+        self.CLICKHOUSE_HOST = os.environ.get("CLICKHOUSE_HOST", "mock")
+        self.CLICKHOUSE_USERNAME = os.environ.get("CLICKHOUSE_USERNAME", "default")
+        self.CLICKHOUSE_PASSWORD = os.environ.get("CLICKHOUSE_PASSWORD", "mock_password")
+        self.CLICKHOUSE_DATABASE = os.environ.get("CLICKHOUSE_DATABASE", "default")
+        
+        # Monitoring settings
+        self.JAEGER_URL = os.environ.get("JAEGER_URL", "http://localhost:14268/api/traces")
+        
+        # Admin user settings
+        self.SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "admin@example.com")
+        self.SUPER_ADMIN_USERNAME = os.environ.get("SUPER_ADMIN_USERNAME", "admin")
+        self.SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "admin")
+        
+        # Add any additional settings your app might need
+        # Set all values passed through kwargs
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+# Apply patches before any imports occur
 def pytest_configure(config):
-    """Configure test environment before any test modules are loaded."""
-    # Mock out third-party modules that try to make connections
+    """Configure test environment before any modules are loaded."""
+    # Set all required environment variables
+    required_env_vars = {
+        "PROJECT_NAME": "Test Project",
+        "POSTGRES_SERVER": "mock",
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "postgres",
+        "POSTGRES_DB": "postgres",
+        "BROKER_USER": "guest",
+        "BROKER_PASSWORD": "guest",
+        "BROKER_HOST": "localhost",
+        "BROKER_PORT": "5672",
+        "BROKER_VHOST": "/",
+        "CLICKHOUSE_HOST": "mock",
+        "CLICKHOUSE_USERNAME": "default",
+        "CLICKHOUSE_PASSWORD": "mock_password",
+        "CLICKHOUSE_DATABASE": "default",
+        "JAEGER_URL": "http://localhost:14268/api/traces",
+        "SUPER_ADMIN_EMAIL": "admin@example.com",
+        "SUPER_ADMIN_USERNAME": "admin",
+        "SUPER_ADMIN_PASSWORD": "admin",
+    }
+    
+    # Set all environment variables
+    for key, value in required_env_vars.items():
+        os.environ[key] = value
+    
+    # Create mock settings instance
+    mock_settings = MockSettings()
+    
+    # Mock modules that might connect to external services
     modules_to_mock = [
         "clickhouse_connect",
         "clickhouse_driver",
@@ -23,71 +99,16 @@ def pytest_configure(config):
     
     # Mock specific functions
     sys.modules["clickhouse_connect"].get_client = MagicMock(return_value=MagicMock())
+    
+    # Create a patch for app.core.config.Settings
+    patcher = patch(f"{SETTINGS_MODULE}.Settings", MockSettings)
+    patcher.start()
+    
+    # Create a patch for app.core.config.settings
+    settings_patcher = patch(f"{SETTINGS_MODULE}.settings", mock_settings)
+    settings_patcher.start()
 
-# Mock Settings class before it's imported
-@pytest.fixture(scope="session", autouse=True)
-def mock_settings():
-    """Mock the Settings class to avoid validation errors."""
-    # Create a fake settings object with all required attributes
-    mock_settings = MagicMock()
-    
-    # Add all required attributes
-    settings_attrs = [
-        "PROJECT_NAME", "API_V1_STR", "POSTGRES_SERVER", "POSTGRES_USER",
-        "POSTGRES_PASSWORD", "POSTGRES_DB", "SQLALCHEMY_DATABASE_URI",
-        "BROKER_USER", "BROKER_PASSWORD", "BROKER_HOST", "BROKER_PORT",
-        "BROKER_VHOST", "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND",
-        "CLICKHOUSE_HOST", "CLICKHOUSE_USERNAME", "CLICKHOUSE_PASSWORD",
-        "CLICKHOUSE_DATABASE", "JAEGER_URL", "SUPER_ADMIN_EMAIL",
-        "SUPER_ADMIN_USERNAME", "SUPER_ADMIN_PASSWORD"
-    ]
-    
-    # Set attributes to test values
-    for attr in settings_attrs:
-        setattr(mock_settings, attr, f"test_{attr.lower()}")
-    
-    # Special handling for database URIs
-    mock_settings.SQLALCHEMY_DATABASE_URI = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
-    
-    # Apply the patch
-    with patch("app.core.config.Settings", return_value=mock_settings):
-        with patch("app.core.config.settings", mock_settings):
-            yield mock_settings
-
-@pytest.fixture(scope="session", autouse=True)
-def setup_env():
-    """Setup environment variables for tests."""
-    # Ensure critical environment variables are set
-    os.environ.setdefault("PROJECT_NAME", "Test Project")
-    
-    # Database env vars
-    os.environ.setdefault("POSTGRES_SERVER", "mock")
-    os.environ.setdefault("POSTGRES_USER", "postgres")
-    os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
-    os.environ.setdefault("POSTGRES_DB", "postgres")
-    
-    # Broker env vars
-    os.environ.setdefault("BROKER_USER", "guest")
-    os.environ.setdefault("BROKER_PASSWORD", "guest")
-    os.environ.setdefault("BROKER_HOST", "localhost")
-    os.environ.setdefault("BROKER_PORT", "5672")
-    os.environ.setdefault("BROKER_VHOST", "/")
-    
-    # ClickHouse env vars
-    os.environ.setdefault("CLICKHOUSE_HOST", "mock")
-    os.environ.setdefault("CLICKHOUSE_USERNAME", "default")
-    os.environ.setdefault("CLICKHOUSE_PASSWORD", "")
-    os.environ.setdefault("CLICKHOUSE_DATABASE", "default")
-    
-    # Other required env vars
-    os.environ.setdefault("JAEGER_URL", "http://localhost:14268/api/traces")
-    os.environ.setdefault("SUPER_ADMIN_EMAIL", "admin@example.com")
-    os.environ.setdefault("SUPER_ADMIN_USERNAME", "admin")
-    os.environ.setdefault("SUPER_ADMIN_PASSWORD", "admin")
-    
-    yield
-
-# Mock database and external connections
+# Set up mocking for connections
 @pytest.fixture(autouse=True)
 def mock_external_connections(monkeypatch):
     """Mock all external connections."""
@@ -95,16 +116,20 @@ def mock_external_connections(monkeypatch):
     monkeypatch.setattr("sqlalchemy.create_engine", MagicMock())
     monkeypatch.setattr("sqlalchemy.ext.asyncio.create_async_engine", MagicMock())
     
-    # Mock asyncpg connections
+    # Mock asyncpg connections if module exists
     if "asyncpg" in sys.modules:
         monkeypatch.setattr("asyncpg.connect", MagicMock())
         monkeypatch.setattr("asyncpg.create_pool", MagicMock())
     
-    # Mock Celery
+    # Mock Celery if module exists
     if "celery" in sys.modules:
         monkeypatch.setattr("celery.Celery", MagicMock())
+    
+    # Mock clickhouse-connect if module exists
+    if "clickhouse_connect" in sys.modules:
+        monkeypatch.setattr("clickhouse_connect.get_client", MagicMock(return_value=MagicMock()))
 
-# Example async fixture if needed for other tests
+# Example async fixture
 @pytest.fixture
 async def async_fixture():
     return "async_value"
