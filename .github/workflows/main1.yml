@@ -1,17 +1,17 @@
 name: CI Pipeline
-
 on:
   push:
     branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master, develop ]
-
 env:
   SONAR_SCANNER_VERSION: "6.1.0.4477"
   SONAR_SCANNER_HOME: "${{ github.workspace }}/sonar-scanner"
   GIT_USER_NAME: "CI BOT"
   GIT_USER_EMAIL: "ci-bot@beehyv.com"
-
+  # Add necessary environment variables for tests
+  PROJECT_NAME: "Test Project"
+  CLICKHOUSE_HOST: "mock"  # Mock value to prevent connection attempts
 jobs:
   test:
     name: Test
@@ -40,10 +40,14 @@ jobs:
         run: |
           poetry install --no-interaction --no-ansi --no-root
       
+      - name: Create mock environment file
+        run: |
+          echo "PROJECT_NAME=Test Project" > .env
+          echo "CLICKHOUSE_HOST=mock" >> .env
+      
       - name: Run tests
         run: |
-          poetry run dotenv run pytest
-
+          poetry run pytest
   scan:
     name: SonarQube Scan
     runs-on: ubuntu-latest
