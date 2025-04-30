@@ -81,6 +81,9 @@ extras = [ "email",]
 version = "2.9.2"
 
 [tool.poetry.group.dev.dependencies]
+pytest-mock = "^3.14.0"
+
+[tool.poetry.group.dev.dependencies]
 devtools = "^0.12.2"
 safety = "^3.2.7"
 pyupgrade = "^3.17.0"
