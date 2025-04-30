@@ -42,12 +42,35 @@ jobs:
       
       - name: Create mock environment file
         run: |
-          echo "PROJECT_NAME=Test Project" > .env
-          echo "CLICKHOUSE_HOST=mock" >> .env
+          cat > .env << EOF
+          PROJECT_NAME=Test Project
+          CLICKHOUSE_HOST=mock
+          # Database settings
+          POSTGRES_SERVER=mock
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres
+          POSTGRES_DB=postgres
+          # Broker settings
+          BROKER_USER=guest
+          BROKER_PASSWORD=guest
+          BROKER_HOST=localhost
+          BROKER_PORT=5672
+          BROKER_VHOST=/
+          # ClickHouse settings
+          CLICKHOUSE_USERNAME=default
+          CLICKHOUSE_PASSWORD=
+          CLICKHOUSE_DATABASE=default
+          # Monitoring
+          JAEGER_URL=http://localhost:14268/api/traces
+          # Admin user
+          SUPER_ADMIN_EMAIL=admin@example.com
+          SUPER_ADMIN_USERNAME=admin
+          SUPER_ADMIN_PASSWORD=admin
+          EOF
       
       - name: Run tests
         run: |
-          poetry run pytest
+          poetry run pytest --no-header
   scan:
     name: SonarQube Scan
     runs-on: ubuntu-latest
