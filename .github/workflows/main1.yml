@@ -1,17 +1,19 @@
 name: CI Pipeline
+
 on:
   push:
     branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master, develop ]
+
 env:
   SONAR_SCANNER_VERSION: "6.1.0.4477"
   SONAR_SCANNER_HOME: "${{ github.workspace }}/sonar-scanner"
   GIT_USER_NAME: "CI BOT"
   GIT_USER_EMAIL: "ci-bot@beehyv.com"
-  # Add necessary environment variables for tests
-  PROJECT_NAME: "Test Project"
-  CLICKHOUSE_HOST: "mock"  # Mock value to prevent connection attempts
+  # Poetry configuration (uncomment if needed)
+  # POETRY_VERSION_PART: ""
+
 jobs:
   test:
     name: Test
@@ -39,41 +41,16 @@ jobs:
       - name: Install dependencies
         run: |
           poetry install --no-interaction --no-ansi --no-root
-      
-      - name: Create mock environment file
+      - name: Load environment variables from .env
+        uses: falti/dotenv-action@v1
+        with:
+          path: .env
+
+      - name: Run tests
         run: |
-          cat > .env << EOF
-          PROJECT_NAME=Test Project
-          # Database settings
-          POSTGRES_SERVER=mock
-          POSTGRES_USER=postgres
-          POSTGRES_PASSWORD=postgres
-          POSTGRES_DB=postgres
-          # Broker settings
-          BROKER_USER=guest
-          BROKER_PASSWORD=guest
-          BROKER_HOST=localhost
-          BROKER_PORT=5672
-          BROKER_VHOST=/
-          # ClickHouse settings
-          CLICKHOUSE_HOST=mock
-          CLICKHOUSE_USERNAME=default
-          CLICKHOUSE_PASSWORD=mock_password
-          CLICKHOUSE_DATABASE=default
-          # Monitoring
-          JAEGER_URL=http://localhost:14268/api/traces
-          # Admin user
-          SUPER_ADMIN_EMAIL=admin@example.com
-          SUPER_ADMIN_USERNAME=admin
-          SUPER_ADMIN_PASSWORD=admin
-          EOF
-      
-      # - name: Run tests
-      #   run: |
-      #     export PYTHONPATH=$PYTHONPATH:$(pwd)
-      #     export CLICKHOUSE_PASSWORD=mock_password
-      #     poetry run pytest -xvs
-  scan:
+          poetry run pytest
+
+    scan:
     name: SonarQube Scan
     runs-on: ubuntu-latest
     steps:
