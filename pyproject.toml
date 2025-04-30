@@ -1,12 +1,12 @@
 [build-system]
-requires = [ "poetry-core",]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "backend"
 version = "2025.1.2"
 description = ""
-authors = [ "Prasanna S R <prasanna@beehyv.com>",]
+authors = ["Prasanna S R <prasanna@beehyv.com>"]
 readme = "README.md"
 package-mode = false
 
@@ -14,7 +14,7 @@ package-mode = false
 line-length = 120
 
 [tool.isort]
-skip = [ "__init__.py",]
+skip = ["__init__.py"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -69,21 +69,19 @@ clickhouse-connect = "^0.8.10"
 clickhouse-driver = "^0.2.9"
 
 [tool.poetry.dependencies.uvicorn]
-extras = [ "standard",]
+extras = ["standard"]
 version = "^0.30.6"
 
 [tool.poetry.dependencies.psycopg]
-extras = [ "binaries",]
+extras = ["binaries"]
 version = "^3.2.1"
 
 [tool.poetry.dependencies.pydantic]
-extras = [ "email",]
+extras = ["email"]
 version = "2.9.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest-mock = "^3.14.0"
-
-[tool.poetry.group.dev.dependencies]
 devtools = "^0.12.2"
 safety = "^3.2.7"
 pyupgrade = "^3.17.0"
