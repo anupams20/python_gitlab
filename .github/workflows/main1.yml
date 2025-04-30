@@ -44,7 +44,6 @@ jobs:
         run: |
           cat > .env << EOF
           PROJECT_NAME=Test Project
-          CLICKHOUSE_HOST=mock
           # Database settings
           POSTGRES_SERVER=mock
           POSTGRES_USER=postgres
@@ -57,8 +56,9 @@ jobs:
           BROKER_PORT=5672
           BROKER_VHOST=/
           # ClickHouse settings
+          CLICKHOUSE_HOST=mock
           CLICKHOUSE_USERNAME=default
-          CLICKHOUSE_PASSWORD=
+          CLICKHOUSE_PASSWORD=mock_password
           CLICKHOUSE_DATABASE=default
           # Monitoring
           JAEGER_URL=http://localhost:14268/api/traces
@@ -70,7 +70,9 @@ jobs:
       
       - name: Run tests
         run: |
-          poetry run pytest --no-header
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          export CLICKHOUSE_PASSWORD=mock_password
+          poetry run pytest -xvs
   scan:
     name: SonarQube Scan
     runs-on: ubuntu-latest
