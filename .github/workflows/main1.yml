@@ -42,7 +42,7 @@ jobs:
       
       - name: Run tests
         run: |
-          poetry run pytest --envfile=.env
+          poetry run dotenv run pytest
 
   scan:
     name: SonarQube Scan
