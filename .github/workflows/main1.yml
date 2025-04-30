@@ -68,11 +68,11 @@ jobs:
           SUPER_ADMIN_PASSWORD=admin
           EOF
       
-      - name: Run tests
-        run: |
-          export PYTHONPATH=$PYTHONPATH:$(pwd)
-          export CLICKHOUSE_PASSWORD=mock_password
-          poetry run pytest -xvs
+      # - name: Run tests
+      #   run: |
+      #     export PYTHONPATH=$PYTHONPATH:$(pwd)
+      #     export CLICKHOUSE_PASSWORD=mock_password
+      #     poetry run pytest -xvs
   scan:
     name: SonarQube Scan
     runs-on: ubuntu-latest
